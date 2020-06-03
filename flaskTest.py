@@ -1,16 +1,18 @@
 # -*- coding: UTF-8 -*-
 import numpy as np
-from flask import Flask
-from flask import request
 import cv2
 import base64
 import re
 import json
-import chardet
+
+from flask import Flask
+from flask import request
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
+
+# 图片读取替代函数，解决读取中文名的问题
 def cv_imread(file_path):
     cv_img = cv2.imdecode(np.fromfile(file_path, dtype=np.uint8), -1)
     return cv_img
@@ -24,10 +26,6 @@ def cv_imread(file_path):
 @app.route('/upload/', methods=['POST'])
 def upload():
     if request.method == 'POST':
-
-        # ip = request.remote_addr
-        # print("request from:", ip)
-
         # cutWid = 100
 
         # 读取切割宽度及文件参数
@@ -36,24 +34,27 @@ def upload():
             f = request.files['file']
             filepath = './upload/' + f.filename
             filepath = re.sub('\"', '', filepath)
-            print(filepath)
 
+            # print(filepath)
             # filename = f.filename
             # print(chardet.detect(filename))
             # print(type(f.filename))
             # f.filename = re.sub(r'\"', '', f.filename)
             # print(f.filename)
             # print(filepath)
+
             try:
                 f.save(filepath)
             except OSError as err:
                 print("OS error: {0}".format(err))
                 return "写入文件出现错误"
+
             try:
                 img = cv_imread(filepath)
             except OSError as err:
                 print("OS error: {0}".format(err))
                 return "读取文件出现错误"
+
         except OSError as err:
             print("OS error: {0}".format(err))
             return "文件或参数发生错误"
@@ -67,18 +68,16 @@ def upload():
         filename = f.filename[0:(re.search('\.', f.filename).span()[1])-1]
         filetype = f.filename[(re.search('\.', f.filename).span()[1]):len(f.filename)]
         filetype = re.sub('\"', '', filetype)
+        # print(filename, filetype)
 
-        print(filename, filetype)
         # 求出切割的分数
         cutCount = int(wid / cutWid) + 1
-
         retImg = {}
 
         # 循环切割图片
         i = 0
         while i < cutCount:
             # print(i)
-
             # 最后一次不一定为整数大小
             if i == cutCount - 1:
                 cropped = img[0:hei, cutWid * i:wid]
@@ -98,13 +97,11 @@ def upload():
             # print(type(base64_str))
 
             retImg[filename + '-' + str(i)+'.'+filetype] = base64_str
-
             # 写分割后的文件，服务器可选是否存储
-            cv2.imwrite("./output/" + filename + '_' + str(i) + '.' + filetype, cropped)
+            # cv2.imwrite("./output/" + filename + '_' + str(i) + '.' + filetype, cropped)
 
             i += 1
 
-        # print(retImg)
         return json.dumps(retImg, ensure_ascii=False)
 
 
