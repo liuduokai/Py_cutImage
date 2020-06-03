@@ -1,11 +1,19 @@
+# -*- coding: UTF-8 -*-
+import numpy as np
 from flask import Flask
 from flask import request
 import cv2
 import base64
 import re
 import json
+import chardet
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+
+def cv_imread(file_path):
+    cv_img = cv2.imdecode(np.fromfile(file_path, dtype=np.uint8), -1)
+    return cv_img
 
 # hello world接口
 # @app.route('/')
@@ -27,8 +35,25 @@ def upload():
             cutWid = int(request.args.get("width"))
             f = request.files['file']
             filepath = './upload/' + f.filename
-            f.save(filepath)
-            img = cv2.imread(filepath)
+            filepath = re.sub('\"', '', filepath)
+            print(filepath)
+
+            # filename = f.filename
+            # print(chardet.detect(filename))
+            # print(type(f.filename))
+            # f.filename = re.sub(r'\"', '', f.filename)
+            # print(f.filename)
+            # print(filepath)
+            try:
+                f.save(filepath)
+            except OSError as err:
+                print("OS error: {0}".format(err))
+                return "写入文件出现错误"
+            try:
+                img = cv_imread(filepath)
+            except OSError as err:
+                print("OS error: {0}".format(err))
+                return "读取文件出现错误"
         except OSError as err:
             print("OS error: {0}".format(err))
             return "文件或参数发生错误"
@@ -38,9 +63,12 @@ def upload():
         # print(img.shape)
 
         # 获取文件名及文件类型
-        filename = f.filename[0:re.search('.', f.filename).span()[1]]
-        filetype = f.filename[(re.search('.', f.filename).span()[1] + 1):len(f.filename)]
+        # print(re.search('\.', f.filename))
+        filename = f.filename[0:(re.search('\.', f.filename).span()[1])-1]
+        filetype = f.filename[(re.search('\.', f.filename).span()[1]):len(f.filename)]
+        filetype = re.sub('\"', '', filetype)
 
+        print(filename, filetype)
         # 求出切割的分数
         cutCount = int(wid / cutWid) + 1
 
@@ -69,15 +97,15 @@ def upload():
                 return "格式转换出现错误"
             # print(type(base64_str))
 
-            retImg[filename + '_' + str(i)+'.'+filetype] = base64_str
+            retImg[filename + '-' + str(i)+'.'+filetype] = base64_str
 
             # 写分割后的文件，服务器可选是否存储
-            # cv2.imwrite("./output/" + filename + '_' + str(i) + '.' + filetype, cropped)
+            cv2.imwrite("./output/" + filename + '_' + str(i) + '.' + filetype, cropped)
 
             i += 1
 
         # print(retImg)
-        return json.dumps(retImg)
+        return json.dumps(retImg, ensure_ascii=False)
 
 
 if __name__ == '__main__':
